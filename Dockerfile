@@ -17,6 +17,9 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
+# Đảm bảo ứng dụng lắng nghe trên 0.0.0.0:10000 (Render yêu cầu)
+ENV ASPNETCORE_URLS=http://0.0.0.0:10000
+
 # Create a non-root user
 RUN addgroup --system --gid 1001 dotnet
 RUN adduser --system --uid 1001 --gid 1001 dotnet
