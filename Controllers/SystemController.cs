@@ -13,38 +13,44 @@ public class SystemController : ControllerBase
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<SystemController> _logger;
+    private readonly IWebHostEnvironment _environment;
     
     public SystemController(
         SystemMetricsService metrics,
         HttpClient httpClient,
         IConfiguration configuration,
-        ILogger<SystemController> logger)
+        ILogger<SystemController> logger,
+        IWebHostEnvironment environment)
     {
         _metrics = metrics;
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger;
+        _environment = environment;
 
         var baseUrl = _configuration["TextGenerateService:BaseUrl"];
-        if (string.IsNullOrEmpty(baseUrl))
+        
+        // Force production URL if we're in production environment
+        if (_environment.IsProduction())
         {
-            // Different fallbacks based on environment
-            var environment = _configuration["ASPNETCORE_ENVIRONMENT"] ?? "Development";
-            if (environment.Equals("Production", StringComparison.OrdinalIgnoreCase))
-            {
-                baseUrl = "https://text-generate-services.onrender.com";
-            }
-            else
-            {
-                baseUrl = "http://127.0.0.1:8000";
-            }
+            baseUrl = "https://text-generate-services.onrender.com";
+            _logger.LogInformation("Production environment detected - forcing BaseUrl: {BaseUrl}", baseUrl);
+        }
+        else if (string.IsNullOrEmpty(baseUrl))
+        {
+            baseUrl = "http://127.0.0.1:8000";
+            _logger.LogInformation("Development environment - using fallback URL: {BaseUrl}", baseUrl);
+        }
+        else
+        {
+            _logger.LogInformation("Using configured BaseUrl: {BaseUrl}", baseUrl);
         }
         
         _httpClient.BaseAddress = new Uri(baseUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(_configuration.GetValue<int>("TextGenerateService:Timeout", 120));
         
-        _logger.LogInformation("HttpClient configured with BaseUrl: {BaseUrl}, Timeout: {Timeout}s", 
-            _httpClient.BaseAddress, _httpClient.Timeout.TotalSeconds);
+        _logger.LogInformation("HttpClient configured - BaseUrl: {BaseUrl}, Timeout: {Timeout}s, Environment: {Environment}", 
+            _httpClient.BaseAddress, _httpClient.Timeout.TotalSeconds, _environment.EnvironmentName);
     }
 
     // Root returns raw data; UnifiedResponseFilter will wrap it to ApiResponse
