@@ -25,9 +25,26 @@ public class SystemController : ControllerBase
         _configuration = configuration;
         _logger = logger;
 
-        var baseUrl = _configuration["TextGenerateService:BaseUrl"] ?? "http://text-generate-app:80";
+        var baseUrl = _configuration["TextGenerateService:BaseUrl"];
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            // Different fallbacks based on environment
+            var environment = _configuration["ASPNETCORE_ENVIRONMENT"] ?? "Development";
+            if (environment.Equals("Production", StringComparison.OrdinalIgnoreCase))
+            {
+                baseUrl = "https://text-generate-services.onrender.com";
+            }
+            else
+            {
+                baseUrl = "http://127.0.0.1:8000";
+            }
+        }
+        
         _httpClient.BaseAddress = new Uri(baseUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(_configuration.GetValue<int>("TextGenerateService:Timeout", 120));
+        
+        _logger.LogInformation("HttpClient configured with BaseUrl: {BaseUrl}, Timeout: {Timeout}s", 
+            _httpClient.BaseAddress, _httpClient.Timeout.TotalSeconds);
     }
 
     // Root returns raw data; UnifiedResponseFilter will wrap it to ApiResponse

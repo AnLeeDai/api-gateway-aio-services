@@ -72,6 +72,18 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Log configuration values for debugging
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var configuration = app.Services.GetRequiredService<IConfiguration>();
+
+logger.LogInformation("=== Configuration Debug Info ===");
+logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
+logger.LogInformation("TextGenerateService:BaseUrl = {BaseUrl}", configuration["TextGenerateService:BaseUrl"]);
+logger.LogInformation("TextGenerateService:Timeout = {Timeout}", configuration["TextGenerateService:Timeout"]);
+logger.LogInformation("TextGenerateService:RetryCount = {RetryCount}", configuration["TextGenerateService:RetryCount"]);
+logger.LogInformation("ASPNETCORE_ENVIRONMENT = {AspNetCoreEnv}", Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"));
+logger.LogInformation("=== End Configuration Debug ===");
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
