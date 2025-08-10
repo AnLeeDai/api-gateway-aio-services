@@ -1,0 +1,18 @@
+# .dockerignore
+bin/
+obj/
+.vs/
+.vscode/
+*.md
+README.md
+DEPLOYMENT.md
+INTEGRATION_README.md
+.git/
+.gitignore
+docker-compose.yml
+docker-compose.prod.yml
+render.yaml
+scripts/
+net9.0/
+Makefile
+start.sh

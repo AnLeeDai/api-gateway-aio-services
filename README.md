@@ -24,7 +24,20 @@ scripts/run.sh dev
 ### 3. Chạy bằng Docker
 
 ```bash
+# Development
 docker compose up -d
+
+# Production
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### 4. Deploy lên Render
+
+Xem chi tiết trong [DEPLOYMENT.md](DEPLOYMENT.md)
+
+```bash
+# Test production build locally
+./scripts/build-prod.sh
 ```
 
 ## Cách gọi đến các services khác
@@ -45,6 +58,16 @@ curl http://localhost:8080/api/text-generate/system/server-info
 curl -X POST http://localhost:8080/api/text-generate/bank-bill \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Generate bank bill"}'
+```
+
+### 3. Production Endpoints (Render)
+
+```bash
+# Health check
+curl https://your-app.onrender.com/health
+
+# System info
+curl https://your-app.onrender.com/api/system/summary
 ```
 
 ### 3. Thêm service mới
