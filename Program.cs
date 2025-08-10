@@ -54,19 +54,50 @@ builder.Services.AddHttpClient();
 
 // Add custom services
 builder.Services.AddScoped<SystemMetricsService>();
+builder.Services.AddSingleton<ServiceEndpointsService>();
 
 // Add YARP (Yet Another Reverse Proxy) - Temporarily disabled due to .NET 9 compatibility
 // builder.Services.AddReverseProxy()
 //     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-// Add CORS if needed
+// Add CORS configuration from environment variables
 builder.Services.AddCors(options =>
 {
+    var allowedOrigins = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS") ?? "*";
+    var allowedMethods = Environment.GetEnvironmentVariable("CORS_ALLOWED_METHODS") ?? "GET,POST,PUT,DELETE,OPTIONS";
+    var allowedHeaders = Environment.GetEnvironmentVariable("CORS_ALLOWED_HEADERS") ?? "*";
+    
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
+        if (allowedOrigins == "*")
+        {
+            policy.AllowAnyOrigin();
+        }
+        else
+        {
+            var origins = allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            policy.WithOrigins(origins);
+        }
+        
+        if (allowedMethods == "*")
+        {
+            policy.AllowAnyMethod();
+        }
+        else
+        {
+            var methods = allowedMethods.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            policy.WithMethods(methods);
+        }
+        
+        if (allowedHeaders == "*")
+        {
+            policy.AllowAnyHeader();
+        }
+        else
+        {
+            var headers = allowedHeaders.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            policy.WithHeaders(headers);
+        }
     });
 });
 
@@ -93,6 +124,9 @@ if (app.Environment.IsDevelopment())
 
 // Add global exception middleware first
 app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// Add configuration logging middleware (runs once)
+app.UseMiddleware<ConfigurationLoggingMiddleware>();
 
 // Use CORS
 app.UseCors();

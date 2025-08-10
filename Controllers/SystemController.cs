@@ -14,60 +14,30 @@ public class SystemController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly ILogger<SystemController> _logger;
     private readonly IWebHostEnvironment _environment;
+    private readonly ServiceEndpointsService _endpointsService;
     
     public SystemController(
         SystemMetricsService metrics,
         HttpClient httpClient,
         IConfiguration configuration,
         ILogger<SystemController> logger,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        ServiceEndpointsService endpointsService)
     {
         _metrics = metrics;
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger;
         _environment = environment;
+        _endpointsService = endpointsService;
 
-        var baseUrl = _configuration["TextGenerateService:BaseUrl"];
+        var config = _endpointsService.GetConfig();
         
-        // Check for environment variable first (highest priority)
-        var envBaseUrl = Environment.GetEnvironmentVariable("TEXT_GENERATE_SERVICE_URL");
-        if (!string.IsNullOrEmpty(envBaseUrl))
-        {
-            baseUrl = envBaseUrl;
-            _logger.LogInformation("Using environment variable TEXT_GENERATE_SERVICE_URL: {BaseUrl}", baseUrl);
-        }
-        else if (string.IsNullOrEmpty(baseUrl))
-        {
-            // Fallback to default development URL
-            baseUrl = "http://127.0.0.1:8000";
-            _logger.LogWarning("No TEXT_GENERATE_SERVICE_URL environment variable or BaseUrl config found. Using fallback: {BaseUrl}", baseUrl);
-        }
-        else
-        {
-            _logger.LogInformation("Using configured BaseUrl from appsettings: {BaseUrl}", baseUrl);
-        }
+        _httpClient.BaseAddress = new Uri(config.TextGenerateBaseUrl);
+        _httpClient.Timeout = TimeSpan.FromSeconds(config.TextGenerateTimeout);
         
-        _httpClient.BaseAddress = new Uri(baseUrl);
-        
-        // Get timeout from environment variable or configuration
-        var timeout = Environment.GetEnvironmentVariable("TEXT_GENERATE_TIMEOUT");
-        var timeoutSeconds = 120; // default
-        if (!string.IsNullOrEmpty(timeout) && int.TryParse(timeout, out var envTimeout))
-        {
-            timeoutSeconds = envTimeout;
-            _logger.LogInformation("Using timeout from environment variable: {Timeout}s", timeoutSeconds);
-        }
-        else
-        {
-            timeoutSeconds = _configuration.GetValue<int>("TextGenerateService:Timeout", 120);
-            _logger.LogInformation("Using timeout from configuration: {Timeout}s", timeoutSeconds);
-        }
-        
-        _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-        
-        _logger.LogInformation("HttpClient configured - BaseUrl: {BaseUrl}, Timeout: {Timeout}s, Environment: {Environment}", 
-            _httpClient.BaseAddress, _httpClient.Timeout.TotalSeconds, _environment.EnvironmentName);
+        _logger.LogInformation("HttpClient configured from ServiceEndpointsService - BaseUrl: {BaseUrl}, Timeout: {Timeout}s", 
+            _httpClient.BaseAddress, _httpClient.Timeout.TotalSeconds);
     }
 
     // Root returns raw data; UnifiedResponseFilter will wrap it to ApiResponse
@@ -173,18 +143,8 @@ public class SystemController : ControllerBase
     private async Task<dynamic> CheckTextGenerateServiceHealth()
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
-        // Get retry count from environment variable or configuration
-        var retryCountEnv = Environment.GetEnvironmentVariable("TEXT_GENERATE_RETRY_COUNT");
-        var retryCount = 3; // default
-        if (!string.IsNullOrEmpty(retryCountEnv) && int.TryParse(retryCountEnv, out var envRetryCount))
-        {
-            retryCount = envRetryCount;
-        }
-        else
-        {
-            retryCount = _configuration.GetValue<int>("TextGenerateService:RetryCount", 3);
-        }
+        var config = _endpointsService.GetConfig();
+        var retryCount = config.TextGenerateRetryCount;
         
         for (int attempt = 1; attempt <= retryCount; attempt++)
         {
@@ -192,7 +152,7 @@ public class SystemController : ControllerBase
             {
                 _logger.LogInformation("Checking text-generate service health, attempt {Attempt}/{RetryCount}", attempt, retryCount);
                 
-                var response = await _httpClient.GetAsync("/api/system/server-info");
+                var response = await _httpClient.GetAsync(config.TextGenerateHealthPath);
                 stopwatch.Stop();
                 var responseTimeMs = stopwatch.ElapsedMilliseconds;
                 

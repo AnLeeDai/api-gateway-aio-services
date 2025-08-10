@@ -10,14 +10,47 @@ services:
     branch: main
     healthCheckPath: /health
     envVars:
+      # ASP.NET Core Configuration
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
       - key: ASPNETCORE_URLS
         value: http://0.0.0.0:10000
       - key: PORT
         value: "10000"
+      
+      # Text Generate Service Configuration
       - key: TEXT_GENERATE_SERVICE_URL
         value: https://text-generate-services.onrender.com
+      - key: TEXT_GENERATE_TIMEOUT
+        value: "120"
+      - key: TEXT_GENERATE_RETRY_COUNT
+        value: "3"
+      - key: TEXT_GENERATE_HEALTH_PATH
+        value: "/api/system/server-info"
+      
+      # Health Check Configuration
+      - key: HEALTH_CHECK_INTERVAL
+        value: "00:01:00"
+      - key: HEALTH_CHECK_TIMEOUT
+        value: "00:00:30"
+      - key: PASSIVE_HEALTH_REACTIVATION_PERIOD
+        value: "00:00:10"
+      
+      # Load Balancing Configuration
+      - key: LOAD_BALANCING_POLICY
+        value: "RoundRobin"
+      
+      # CORS Configuration
+      - key: CORS_ALLOWED_ORIGINS
+        value: "*"
+      - key: CORS_ALLOWED_METHODS
+        value: "GET,POST,PUT,DELETE,OPTIONS"
+      - key: CORS_ALLOWED_HEADERS
+        value: "*"
+      
+      # Logging Configuration
+      - key: LOG_LEVEL
+        value: "Information"
     scaling:
       minInstances: 1
       maxInstances: 1
