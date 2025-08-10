@@ -1,0 +1,50 @@
+version: "3.8"
+
+networks:
+  app-network:
+    driver: bridge
+
+services:
+  api-gateway:
+    image: mcr.microsoft.com/dotnet/aspnet:9.0
+    container_name: api-gateway
+    working_dir: /app
+    command: ["dotnet", "ApiGateway.dll"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:5257
+    volumes:
+      - ./net9.0:/app:ro
+    ports:
+      - "5257:5257"
+    networks:
+      - app-network
+    depends_on:
+      - text-generate-app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5257/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  text-generate-app:
+    build: ../text-generate-services
+    container_name: text-generate-app
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://text-generate-app:8000
+      SERVER_PORT: 8000
+    volumes:
+      - ../text-generate-services:/var/www
+    ports:
+      - "8000:8000"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/system/server-info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
