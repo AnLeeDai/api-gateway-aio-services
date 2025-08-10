@@ -27,7 +27,7 @@ public class SystemController : ControllerBase
 
         var baseUrl = _configuration["TextGenerateService:BaseUrl"] ?? "http://text-generate-app:80";
         _httpClient.BaseAddress = new Uri(baseUrl);
-        _httpClient.Timeout = TimeSpan.FromSeconds(_configuration.GetValue<int>("TextGenerateService:Timeout", 30));
+        _httpClient.Timeout = TimeSpan.FromSeconds(_configuration.GetValue<int>("TextGenerateService:Timeout", 120));
     }
 
     // Root returns raw data; UnifiedResponseFilter will wrap it to ApiResponse
@@ -107,65 +107,136 @@ public class SystemController : ControllerBase
         }
     }
 
+    [HttpGet("health/text-generate")]
+    public async Task<ActionResult> TextGenerateHealthCheck(CancellationToken ct)
+    {
+        try
+        {
+            var health = await CheckTextGenerateServiceHealth();
+            if (health.status == "healthy")
+            {
+                return Ok(health);
+            }
+            return StatusCode(503, health); // Service Unavailable
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking text-generate service health");
+            return StatusCode(503, new { 
+                status = "error", 
+                error = ex.Message,
+                lastChecked = DateTimeOffset.UtcNow
+            });
+        }
+    }
+
     private async Task<dynamic> CheckTextGenerateServiceHealth()
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var retryCount = _configuration.GetValue<int>("TextGenerateService:RetryCount", 3);
         
-        try
+        for (int attempt = 1; attempt <= retryCount; attempt++)
         {
-            var response = await _httpClient.GetAsync("/api/system/server-info");
-            stopwatch.Stop();
-            var responseTimeMs = stopwatch.ElapsedMilliseconds;
-            
-            if (response.IsSuccessStatusCode)
+            try
             {
-                var content = await response.Content.ReadAsStringAsync();
-                var serverInfo = JsonSerializer.Deserialize<object>(content);
+                _logger.LogInformation("Checking text-generate service health, attempt {Attempt}/{RetryCount}", attempt, retryCount);
                 
-                return new
+                var response = await _httpClient.GetAsync("/api/system/server-info");
+                stopwatch.Stop();
+                var responseTimeMs = stopwatch.ElapsedMilliseconds;
+                
+                if (response.IsSuccessStatusCode)
                 {
-                    status = "healthy",
-                    responseTimeMs = responseTimeMs,
-                    responseTime = $"{responseTimeMs}ms",
-                    lastChecked = DateTimeOffset.UtcNow,
-                    serverInfo = serverInfo
-                };
+                    var content = await response.Content.ReadAsStringAsync();
+                    var serverInfo = JsonSerializer.Deserialize<object>(content);
+                    
+                    _logger.LogInformation("Text-generate service health check successful on attempt {Attempt}, response time: {ResponseTime}ms", attempt, responseTimeMs);
+                    
+                    return new
+                    {
+                        status = "healthy",
+                        responseTimeMs = responseTimeMs,
+                        responseTime = $"{responseTimeMs}ms",
+                        lastChecked = DateTimeOffset.UtcNow,
+                        attemptsUsed = attempt,
+                        serverInfo = serverInfo
+                    };
+                }
+                
+                _logger.LogWarning("Text-generate service returned {StatusCode} on attempt {Attempt}", response.StatusCode, attempt);
+                
+                if (attempt == retryCount)
+                {
+                    return new
+                    {
+                        status = "unhealthy",
+                        responseTimeMs = responseTimeMs,
+                        responseTime = $"{responseTimeMs}ms",
+                        statusCode = (int)response.StatusCode,
+                        reason = response.ReasonPhrase,
+                        lastChecked = DateTimeOffset.UtcNow,
+                        attemptsUsed = attempt
+                    };
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "HTTP request failed on attempt {Attempt}: {Message}", attempt, ex.Message);
+                
+                if (attempt == retryCount)
+                {
+                    stopwatch.Stop();
+                    return new
+                    {
+                        status = "unreachable",
+                        responseTimeMs = stopwatch.ElapsedMilliseconds,
+                        responseTime = $"{stopwatch.ElapsedMilliseconds}ms",
+                        error = ex.Message,
+                        lastChecked = DateTimeOffset.UtcNow,
+                        attemptsUsed = attempt
+                    };
+                }
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogWarning(ex, "Request timeout on attempt {Attempt}: {Message}", attempt, ex.Message);
+                
+                if (attempt == retryCount)
+                {
+                    stopwatch.Stop();
+                    return new
+                    {
+                        status = "timeout",
+                        responseTimeMs = stopwatch.ElapsedMilliseconds,
+                        responseTime = $"{stopwatch.ElapsedMilliseconds}ms",
+                        error = "Request timeout",
+                        details = ex.Message,
+                        lastChecked = DateTimeOffset.UtcNow,
+                        attemptsUsed = attempt
+                    };
+                }
             }
             
-            return new
+            // Wait before retry (except on last attempt)
+            if (attempt < retryCount)
             {
-                status = "unhealthy",
-                responseTimeMs = responseTimeMs,
-                responseTime = $"{responseTimeMs}ms",
-                statusCode = (int)response.StatusCode,
-                reason = response.ReasonPhrase,
-                lastChecked = DateTimeOffset.UtcNow
-            };
+                var delayMs = attempt * 2000; // Progressive delay: 2s, 4s, 6s...
+                _logger.LogInformation("Waiting {DelayMs}ms before retry attempt {NextAttempt}", delayMs, attempt + 1);
+                await Task.Delay(delayMs);
+                stopwatch.Restart(); // Restart timer for next attempt
+            }
         }
-        catch (HttpRequestException ex)
+        
+        // This should never be reached, but just in case
+        stopwatch.Stop();
+        return new
         {
-            stopwatch.Stop();
-            return new
-            {
-                status = "unreachable",
-                responseTimeMs = stopwatch.ElapsedMilliseconds,
-                responseTime = $"{stopwatch.ElapsedMilliseconds}ms",
-                error = ex.Message,
-                lastChecked = DateTimeOffset.UtcNow
-            };
-        }
-        catch (TaskCanceledException ex)
-        {
-            stopwatch.Stop();
-            return new
-            {
-                status = "timeout",
-                responseTimeMs = stopwatch.ElapsedMilliseconds,
-                responseTime = $"{stopwatch.ElapsedMilliseconds}ms",
-                error = "Request timeout",
-                details = ex.Message,
-                lastChecked = DateTimeOffset.UtcNow
-            };
-        }
+            status = "unknown",
+            error = "Unexpected end of retry loop",
+            responseTimeMs = stopwatch.ElapsedMilliseconds,
+            responseTime = $"{stopwatch.ElapsedMilliseconds}ms",
+            lastChecked = DateTimeOffset.UtcNow,
+            attemptsUsed = retryCount
+        };
     }
 }

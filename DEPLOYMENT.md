@@ -53,16 +53,26 @@ The application intelligently detects the environment:
 
 - **Text Generate Service**: `https://text-generate-services.onrender.com`
 - **Health Check**: `/health` endpoint
+- **Text Generate Health**: `/health/text-generate` endpoint  
 - **Port**: 10000 (Render requirement)
 - **Environment**: Production
+- **Timeout**: 120 seconds (increased for cold start handling)
+- **Retry Logic**: 3 attempts with progressive delay
+- **Health Check Interval**: 60 seconds (reduced frequency for stability)
 
 ## API Endpoints
 
 - Health Check: `GET /health`
-- System Summary: `GET /api/system/summary`
+- Text Generate Health: `GET /health/text-generate`
+- System Summary: `GET /api/system/summary`  
 - Text Generate: `POST /api/text-generate/{action}`
 - Bank Bill: `/api/bank-bill/{endpoint}`
 - Proxy: `/api/proxy/{endpoint}`
+
+## Testing Scripts
+
+- `scripts/test-text-generate-connection.sh`: Test text-generate service connectivity
+- `scripts/test-and-build.sh`: Build and test application locally
 
 ## Configuration Files
 
