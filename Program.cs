@@ -4,25 +4,40 @@ using ApiGateway.Filters;
 using System.Net;
 using System.Net.NetworkInformation;
 
-// Fixed port configuration - DO NOT CHANGE
-const int FIXED_PORT = 5257;
-
-// Check if port is available before starting
-if (!IsPortAvailable(FIXED_PORT))
-{
-    Console.ForegroundColor = ConsoleColor.Red;
-    Console.WriteLine($"❌ ERROR: Port {FIXED_PORT} is already in use!");
-    Console.WriteLine($"🚫 CANNOT START API Gateway - PORT {FIXED_PORT} IS OCCUPIED");
-    Console.WriteLine($"Please stop the process using port {FIXED_PORT} or wait for it to be available.");
-    Console.WriteLine($"Do not change to another port - this service must run on port {FIXED_PORT}.");
-    Console.ResetColor();
-    Environment.Exit(1);
-}
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Force the application to use the fixed port
-builder.WebHost.UseUrls($"http://localhost:{FIXED_PORT}");
+// Configure URLs based on environment
+var environment = builder.Environment.EnvironmentName;
+var isProduction = environment.Equals("Production", StringComparison.OrdinalIgnoreCase);
+
+if (isProduction)
+{
+    // For production (Render), use the PORT environment variable or default to 10000
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
+    var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? $"http://0.0.0.0:{port}";
+    builder.WebHost.UseUrls(urls);
+    Console.WriteLine($"🚀 Production mode: Binding to {urls}");
+}
+else
+{
+    // For development, use fixed port configuration
+    const int FIXED_PORT = 5257;
+    
+    // Check if port is available before starting
+    if (!IsPortAvailable(FIXED_PORT))
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"❌ ERROR: Port {FIXED_PORT} is already in use!");
+        Console.WriteLine($"🚫 CANNOT START API Gateway - PORT {FIXED_PORT} IS OCCUPIED");
+        Console.WriteLine($"Please stop the process using port {FIXED_PORT} or wait for it to be available.");
+        Console.WriteLine($"Do not change to another port - this service must run on port {FIXED_PORT}.");
+        Console.ResetColor();
+        Environment.Exit(1);
+    }
+    
+    builder.WebHost.UseUrls($"http://localhost:{FIXED_PORT}");
+    Console.WriteLine($"🔧 Development mode: Binding to http://localhost:{FIXED_PORT}");
+}
 
 // Add services to the container.
 builder.Services.AddControllers(options =>
