@@ -13,10 +13,6 @@ services:
       # ASP.NET Core Configuration
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-      - key: ASPNETCORE_URLS
-        value: http://0.0.0.0:10000
-      - key: PORT
-        value: "10000"
       
       # Text Generate Service Configuration
       - key: TEXT_GENERATE_SERVICE_URL

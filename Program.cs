@@ -10,13 +10,20 @@ var builder = WebApplication.CreateBuilder(args);
 var environment = builder.Environment.EnvironmentName;
 var isProduction = environment.Equals("Production", StringComparison.OrdinalIgnoreCase);
 
+Console.WriteLine($"🔍 Environment: {environment}");
+Console.WriteLine($"🔍 Is Production: {isProduction}");
+Console.WriteLine($"🔍 PORT env var: {Environment.GetEnvironmentVariable("PORT")}");
+Console.WriteLine($"🔍 ASPNETCORE_URLS env var: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS")}");
+
 if (isProduction)
 {
-    // For production (Render), use the PORT environment variable or default to 10000
+    // For production (Render), Render automatically sets the PORT environment variable
     var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
-    var urls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? $"http://0.0.0.0:{port}";
+    var urls = $"http://0.0.0.0:{port}";
     builder.WebHost.UseUrls(urls);
     Console.WriteLine($"🚀 Production mode: Binding to {urls}");
+    Console.WriteLine($"🔍 Environment PORT: {Environment.GetEnvironmentVariable("PORT")}");
+    Console.WriteLine($"🔍 Using port: {port}");
 }
 else
 {

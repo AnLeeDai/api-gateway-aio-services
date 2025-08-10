@@ -1,7 +1,7 @@
 # Dockerfile for production deployment on Render
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
-EXPOSE 10000
+# Render sẽ tự động expose port thông qua biến môi trường PORT
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
@@ -17,8 +17,7 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# Đảm bảo ứng dụng lắng nghe trên 0.0.0.0:10000 (Render yêu cầu)
-ENV ASPNETCORE_URLS=http://0.0.0.0:10000
+# Không set ASPNETCORE_URLS ở đây - để Program.cs xử lý từ biến môi trường PORT của Render
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 dotnet
