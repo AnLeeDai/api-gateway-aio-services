@@ -1,63 +1,51 @@
 using ApiGateway.Middleware;
 using ApiGateway.Services;
 using ApiGateway.Filters;
+using ApiGateway.Configuration;
 using System.Net;
 using System.Net.NetworkInformation;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure URLs based on environment
-var environment = builder.Environment.EnvironmentName;
+// Load environment variables and configuration
+builder.Services.AddAppConfiguration(builder.Configuration);
+
+// Get environment configuration
+var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
 var isProduction = environment.Equals("Production", StringComparison.OrdinalIgnoreCase);
+var port = int.Parse(Environment.GetEnvironmentVariable("PORT") ?? (isProduction ? "10000" : "5257"));
 
 Console.WriteLine($"🔍 Environment: {environment}");
 Console.WriteLine($"🔍 Is Production: {isProduction}");
-Console.WriteLine($"🔍 PORT env var: {Environment.GetEnvironmentVariable("PORT")}");
-Console.WriteLine($"🔍 ASPNETCORE_URLS env var: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS")}");
-Console.WriteLine($"🔍 DOTNET_RUNNING_IN_CONTAINER: {Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")}");
-Console.WriteLine($"🔍 Current working directory: {Directory.GetCurrentDirectory()}");
+Console.WriteLine($"🔍 Port: {port}");
+Console.WriteLine($"🔍 Text Generate Base URL: {Environment.GetEnvironmentVariable("TEXT_GENERATE_BASE_URL")}");
 
+// Configure URLs
 if (isProduction)
 {
-    // For production (Render), Render automatically sets the PORT environment variable
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
     var urls = $"http://0.0.0.0:{port}";
-    
-    // Set ASPNETCORE_URLS if not already set by Render
-    if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
-    {
-        Environment.SetEnvironmentVariable("ASPNETCORE_URLS", urls);
-    }
-    
     builder.WebHost.UseUrls(urls);
     Console.WriteLine($"🚀 Production mode: Binding to {urls}");
-    Console.WriteLine($"🔍 Environment PORT: {Environment.GetEnvironmentVariable("PORT")}");
-    Console.WriteLine($"🔍 Using port: {port}");
-    Console.WriteLine($"🔍 Final ASPNETCORE_URLS: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS")}");
     
-    // Add health checks for Render
+    // Add health checks for production
     builder.Services.AddHealthChecks();
 }
 else
 {
-    // For development, use fixed port configuration
-    const int FIXED_PORT = 5257;
-    
-    // Check if port is available before starting
-    if (!IsPortAvailable(FIXED_PORT))
+    // Check if port is available in development
+    if (!IsPortAvailable(port))
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"❌ ERROR: Port {FIXED_PORT} is already in use!");
-        Console.WriteLine($"🚫 CANNOT START API Gateway - PORT {FIXED_PORT} IS OCCUPIED");
-        Console.WriteLine($"Please stop the process using port {FIXED_PORT} or wait for it to be available.");
-        Console.WriteLine($"Do not change to another port - this service must run on port {FIXED_PORT}.");
+        Console.WriteLine($"❌ ERROR: Port {port} is already in use!");
+        Console.WriteLine($"🚫 CANNOT START API Gateway - PORT {port} IS OCCUPIED");
+        Console.WriteLine($"Please stop the process using port {port} or wait for it to be available.");
         Console.ResetColor();
         Environment.Exit(1);
     }
     
-    builder.WebHost.UseUrls($"http://localhost:{FIXED_PORT}");
-    Console.WriteLine($"🔧 Development mode: Binding to http://localhost:{FIXED_PORT}");
+    builder.WebHost.UseUrls($"http://localhost:{port}");
+    Console.WriteLine($"🔧 Development mode: Binding to http://localhost:{port}");
 }
 
 // Add services to the container.
@@ -158,13 +146,12 @@ app.UseRouting();
 // Map controllers
 app.MapControllers();
 
-// Add health check endpoint for Render
+// Add health check endpoint for production
 if (isProduction)
 {
     app.MapHealthChecks("/health");
     
-    // Log startup information for Render debugging
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
+    // Log startup information for production debugging
     Console.WriteLine($"🌐 Application will be available at: http://0.0.0.0:{port}");
     Console.WriteLine($"🏥 Health check endpoint: http://0.0.0.0:{port}/health");
     Console.WriteLine($"📊 System info endpoint: http://0.0.0.0:{port}/api/system/server-info");

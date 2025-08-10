@@ -1,23 +1,26 @@
 version: "3.8"
 
 networks:
-  app-network:
+  api-network:
     driver: bridge
 
 services:
   api-gateway:
-    image: mcr.microsoft.com/dotnet/aspnet:9.0
-    container_name: api-gateway
-    working_dir: /app
-    command: ["dotnet", "ApiGateway.dll"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-gateway-dev
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://0.0.0.0:5257
-    volumes:
-      - ./net9.0:/app:ro
+      - ASPNETCORE_ENVIRONMENT=Development
+      - PORT=5257
+    env_file:
+      - .env
     ports:
       - "5257:5257"
     networks:
+      - api-network
+    volumes:
+      - ./.env:/app/.env:ro
       - app-network
     depends_on:
       - text-generate-app
