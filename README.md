@@ -1,8 +1,19 @@
 # API Gateway (.NET 9 + YARP)
 
-## Cách chạy API Gateway
+## Quick Start
 
-### 1. Chạy nhanh (Production)
+### 1. Environment Setup
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your configuration
+nano .env
+```
+
+**📖 For detailed environment configuration, see [ENVIRONMENT.md](ENVIRONMENT.md)**
+
+### 2. Production Run
 
 ```bash
 # Cách 1: Dùng Makefile

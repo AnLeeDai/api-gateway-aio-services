@@ -30,24 +30,41 @@ public class SystemController : ControllerBase
 
         var baseUrl = _configuration["TextGenerateService:BaseUrl"];
         
-        // Force production URL if we're in production environment
-        if (_environment.IsProduction())
+        // Check for environment variable first (highest priority)
+        var envBaseUrl = Environment.GetEnvironmentVariable("TEXT_GENERATE_SERVICE_URL");
+        if (!string.IsNullOrEmpty(envBaseUrl))
         {
-            baseUrl = "https://text-generate-services.onrender.com";
-            _logger.LogInformation("Production environment detected - forcing BaseUrl: {BaseUrl}", baseUrl);
+            baseUrl = envBaseUrl;
+            _logger.LogInformation("Using environment variable TEXT_GENERATE_SERVICE_URL: {BaseUrl}", baseUrl);
         }
         else if (string.IsNullOrEmpty(baseUrl))
         {
+            // Fallback to default development URL
             baseUrl = "http://127.0.0.1:8000";
-            _logger.LogInformation("Development environment - using fallback URL: {BaseUrl}", baseUrl);
+            _logger.LogWarning("No TEXT_GENERATE_SERVICE_URL environment variable or BaseUrl config found. Using fallback: {BaseUrl}", baseUrl);
         }
         else
         {
-            _logger.LogInformation("Using configured BaseUrl: {BaseUrl}", baseUrl);
+            _logger.LogInformation("Using configured BaseUrl from appsettings: {BaseUrl}", baseUrl);
         }
         
         _httpClient.BaseAddress = new Uri(baseUrl);
-        _httpClient.Timeout = TimeSpan.FromSeconds(_configuration.GetValue<int>("TextGenerateService:Timeout", 120));
+        
+        // Get timeout from environment variable or configuration
+        var timeout = Environment.GetEnvironmentVariable("TEXT_GENERATE_TIMEOUT");
+        var timeoutSeconds = 120; // default
+        if (!string.IsNullOrEmpty(timeout) && int.TryParse(timeout, out var envTimeout))
+        {
+            timeoutSeconds = envTimeout;
+            _logger.LogInformation("Using timeout from environment variable: {Timeout}s", timeoutSeconds);
+        }
+        else
+        {
+            timeoutSeconds = _configuration.GetValue<int>("TextGenerateService:Timeout", 120);
+            _logger.LogInformation("Using timeout from configuration: {Timeout}s", timeoutSeconds);
+        }
+        
+        _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
         
         _logger.LogInformation("HttpClient configured - BaseUrl: {BaseUrl}, Timeout: {Timeout}s, Environment: {Environment}", 
             _httpClient.BaseAddress, _httpClient.Timeout.TotalSeconds, _environment.EnvironmentName);
@@ -156,7 +173,18 @@ public class SystemController : ControllerBase
     private async Task<dynamic> CheckTextGenerateServiceHealth()
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        var retryCount = _configuration.GetValue<int>("TextGenerateService:RetryCount", 3);
+        
+        // Get retry count from environment variable or configuration
+        var retryCountEnv = Environment.GetEnvironmentVariable("TEXT_GENERATE_RETRY_COUNT");
+        var retryCount = 3; // default
+        if (!string.IsNullOrEmpty(retryCountEnv) && int.TryParse(retryCountEnv, out var envRetryCount))
+        {
+            retryCount = envRetryCount;
+        }
+        else
+        {
+            retryCount = _configuration.GetValue<int>("TextGenerateService:RetryCount", 3);
+        }
         
         for (int attempt = 1; attempt <= retryCount; attempt++)
         {

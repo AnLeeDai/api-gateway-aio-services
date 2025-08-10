@@ -16,6 +16,8 @@ services:
         value: http://0.0.0.0:10000
       - key: PORT
         value: "10000"
+      - key: TEXT_GENERATE_SERVICE_URL
+        value: https://text-generate-services.onrender.com
     scaling:
       minInstances: 1
       maxInstances: 1
