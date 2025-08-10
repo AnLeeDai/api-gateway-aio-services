@@ -45,6 +45,14 @@ services:
         value: "true"
       - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
         value: "true"
+      
+      # CORS Configuration (if needed)
+      - key: CORS_ALLOWED_ORIGINS
+        value: "*"
+      - key: CORS_ALLOWED_METHODS
+        value: "GET,POST,PUT,DELETE,OPTIONS"
+      - key: CORS_ALLOWED_HEADERS
+        value: "*"
     scaling:
       minInstances: 1
       maxInstances: 1
