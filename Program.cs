@@ -3,6 +3,7 @@ using ApiGateway.Services;
 using ApiGateway.Filters;
 using System.Net;
 using System.Net.NetworkInformation;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,16 +15,29 @@ Console.WriteLine($"🔍 Environment: {environment}");
 Console.WriteLine($"🔍 Is Production: {isProduction}");
 Console.WriteLine($"🔍 PORT env var: {Environment.GetEnvironmentVariable("PORT")}");
 Console.WriteLine($"🔍 ASPNETCORE_URLS env var: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS")}");
+Console.WriteLine($"🔍 DOTNET_RUNNING_IN_CONTAINER: {Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")}");
+Console.WriteLine($"🔍 Current working directory: {Directory.GetCurrentDirectory()}");
 
 if (isProduction)
 {
     // For production (Render), Render automatically sets the PORT environment variable
     var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
     var urls = $"http://0.0.0.0:{port}";
+    
+    // Set ASPNETCORE_URLS if not already set by Render
+    if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+    {
+        Environment.SetEnvironmentVariable("ASPNETCORE_URLS", urls);
+    }
+    
     builder.WebHost.UseUrls(urls);
     Console.WriteLine($"🚀 Production mode: Binding to {urls}");
     Console.WriteLine($"🔍 Environment PORT: {Environment.GetEnvironmentVariable("PORT")}");
     Console.WriteLine($"🔍 Using port: {port}");
+    Console.WriteLine($"🔍 Final ASPNETCORE_URLS: {Environment.GetEnvironmentVariable("ASPNETCORE_URLS")}");
+    
+    // Add health checks for Render
+    builder.Services.AddHealthChecks();
 }
 else
 {
@@ -144,8 +158,17 @@ app.UseRouting();
 // Map controllers
 app.MapControllers();
 
-// Map YARP reverse proxy - Temporarily disabled due to .NET 9 compatibility
-// app.MapReverseProxy();
+// Add health check endpoint for Render
+if (isProduction)
+{
+    app.MapHealthChecks("/health");
+    
+    // Log startup information for Render debugging
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "10000";
+    Console.WriteLine($"🌐 Application will be available at: http://0.0.0.0:{port}");
+    Console.WriteLine($"🏥 Health check endpoint: http://0.0.0.0:{port}/health");
+    Console.WriteLine($"📊 System info endpoint: http://0.0.0.0:{port}/api/system/server-info");
+}
 
 app.Run();
 

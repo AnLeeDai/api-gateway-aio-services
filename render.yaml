@@ -47,6 +47,12 @@ services:
       # Logging Configuration
       - key: LOG_LEVEL
         value: "Information"
+      
+      # Render-specific configurations
+      - key: DOTNET_RUNNING_IN_CONTAINER
+        value: "true"
+      - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
     scaling:
       minInstances: 1
       maxInstances: 1
